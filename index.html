@@ -51,8 +51,8 @@
     <div class="stats" id="stats"></div>
   </div>
   <div class="tabs">
-    <button class="tab active" data-view="graph">Graph</button>
-    <button class="tab" data-view="table">Table</button>
+    <button class="tab" data-view="graph">Graph</button>
+    <button class="tab active" data-view="table">Table</button>
   </div>
 </header>
 <main>
@@ -70,8 +70,8 @@
     <div class="filter-group" id="legend"></div>
   </aside>
   <div id="content">
-    <svg id="graph"></svg>
-    <div id="table" style="display:none"></div>
+    <svg id="graph" style="display:none"></svg>
+    <div id="table"></div>
   </div>
 </main>
 <div class="tooltip" id="tip"></div>
@@ -336,6 +336,10 @@ function buildLinks(nodes){
 }
 
 function drawGraph(){
+  if(typeof d3==="undefined"){
+    document.getElementById("graph").outerHTML='<div id="graph" style="padding:40px;color:var(--muted);max-width:600px">D3 failed to load (likely no internet access when opening via file://). Use the Table view, or run a local server: <code>python3 -m http.server 8000</code></div>';
+    return;
+  }
   const svg = d3.select("#graph");
   svg.selectAll("*").remove();
   const container = document.getElementById("content");
