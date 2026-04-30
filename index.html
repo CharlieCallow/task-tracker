@@ -162,7 +162,7 @@ let TASKS = [];
 const filters = {priority:new Set(), status:new Set(), owner:new Set(), section:new Set(), q:""};
 
 TASKS = window.__TASKS__;
-init();
+// init() runs at end of script after EDGE_META/SEMANTIC_EDGES are declared
 
 function init(){
   document.getElementById("stats").textContent =
@@ -408,6 +408,8 @@ function showTip(e,d){
 }
 function moveTip(e){tip.style.left=(e.pageX+14)+"px";tip.style.top=(e.pageY+14)+"px";}
 function hideTip(){tip.style.display="none";}
+
+init();
 </script>
 </body>
 </html>
