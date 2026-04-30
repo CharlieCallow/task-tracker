@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hillgate MiCAR – Task Tracker</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  :root {
+    --bg:#0f1419; --panel:#1a2029; --border:#2a3340; --text:#e6e9ef;
+    --muted:#8b95a7; --accent:#4f9cf9;
+    --t1:#ef4444; --t2:#f59e0b; --t3:#eab308; --t4:#22c55e; --t5:#8b5cf6; --t0:#6b7280;
+    --status-todo:#6b7280; --status-prog:#3b82f6; --status-done:#10b981;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:13px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+  h1{font-size:16px;margin:0;font-weight:600}
+  .stats{color:var(--muted);font-size:12px}
+  .tabs{display:flex;gap:4px}
+  .tab{padding:6px 14px;background:var(--panel);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text)}
+  .tab.active{background:var(--accent);border-color:var(--accent)}
+  main{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 57px)}
+  aside{background:var(--panel);border-right:1px solid var(--border);padding:14px;overflow-y:auto}
+  aside h3{font-size:11px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;letter-spacing:.05em}
+  aside h3:first-child{margin-top:0}
+  .filter-group{display:flex;flex-direction:column;gap:4px}
+  .filter-group label{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;padding:3px 4px;border-radius:4px}
+  .filter-group label:hover{background:var(--bg)}
+  .legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+  #content{overflow:auto;position:relative}
+  #graph{display:block}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--panel);position:sticky;top:0;font-weight:600;font-size:11px;text-transform:uppercase;color:var(--muted);cursor:pointer}
+  tbody tr:hover{background:var(--panel)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;white-space:nowrap}
+  .search{margin-bottom:10px;width:100%;padding:6px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:12px}
+  .tooltip{position:absolute;pointer-events:none;background:#000;border:1px solid var(--border);padding:8px 10px;border-radius:6px;font-size:12px;max-width:300px;display:none;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+  .tooltip b{color:var(--accent)}
+  .node{cursor:pointer}
+  .node:hover circle{stroke:#fff;stroke-width:2}
+  .link{stroke:#3a4555;stroke-opacity:.5}
+  .link.shared{stroke:#f59e0b;stroke-opacity:.7;stroke-width:2}
+  text.label{fill:var(--text);font-size:10px;pointer-events:none;text-shadow:0 0 3px #000,0 0 3px #000}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Hillgate MiCAR – Task Tracker</h1>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-view="graph">Graph</button>
+    <button class="tab" data-view="table">Table</button>
+  </div>
+</header>
+<main>
+  <aside>
+    <input class="search" id="search" placeholder="Search topics…">
+    <h3>Priority</h3>
+    <div class="filter-group" id="f-priority"></div>
+    <h3>Status</h3>
+    <div class="filter-group" id="f-status"></div>
+    <h3>Owner</h3>
+    <div class="filter-group" id="f-owner"></div>
+    <h3>Section</h3>
+    <div class="filter-group" id="f-section"></div>
+  </aside>
+  <div id="content">
+    <svg id="graph"></svg>
+    <div id="table" style="display:none"></div>
+  </div>
+</main>
+<div class="tooltip" id="tip"></div>
+<script>
+const PRIORITY_COLOR = {"Tier 1":"#ef4444","Tier 2":"#f59e0b","Tier 3":"#eab308","Tier 4":"#22c55e","Tier 5":"#8b5cf6","":"#6b7280"};
+const STATUS_COLOR = {"Not started":"#6b7280","In Progress":"#3b82f6","Done":"#10b981"};
+
+let TASKS = [];
+const filters = {priority:new Set(), status:new Set(), owner:new Set(), section:new Set(), q:""};
+
+fetch("tasks.json").then(r=>r.json()).then(data=>{TASKS=data;init();});
+
+function init(){
+  document.getElementById("stats").textContent =
+    `${TASKS.length} tasks · ${TASKS.filter(t=>t.status==="In Progress").length} in progress · ${TASKS.filter(t=>t.priority==="Tier 1").length} Tier 1`;
+
+  buildFilter("f-priority", uniq(TASKS.map(t=>t.priority||"(none)")), "priority", v=>v==="(none)"?"":v, v=>`<span class="pill" style="background:${PRIORITY_COLOR[v==="(none)"?"":v]};color:#000">${v}</span>`);
+  buildFilter("f-status", uniq(TASKS.map(t=>t.status)), "status", v=>v, v=>`<span class="pill" style="background:${STATUS_COLOR[v]||"#555"}">${v}</span>`);
+  buildFilter("f-owner", uniq(TASKS.flatMap(t=>[t.primary,t.secondary]).filter(x=>x&&x!=="-")), "owner", v=>v);
+  buildFilter("f-section", uniq(TASKS.map(t=>t.section)), "section", v=>v);
+
+  document.getElementById("search").addEventListener("input", e=>{filters.q=e.target.value.toLowerCase();render();});
+  document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    const v = b.dataset.view;
+    document.getElementById("graph").style.display = v==="graph"?"block":"none";
+    document.getElementById("table").style.display = v==="table"?"block":"none";
+    render();
+  }));
+
+  render();
+  window.addEventListener("resize", ()=>{ if(document.getElementById("graph").style.display!=="none") drawGraph(); });
+}
+
+function uniq(arr){return [...new Set(arr)].sort();}
+function buildFilter(elId, values, key, valFn, labelFn){
+  const el = document.getElementById(elId);
+  el.innerHTML = values.map(v=>{
+    const real = valFn(v);
+    return `<label><input type="checkbox" data-key="${key}" data-val="${real}"> ${labelFn?labelFn(v):v}</label>`;
+  }).join("");
+  el.querySelectorAll("input").forEach(i=>i.addEventListener("change",e=>{
+    const s = filters[key];
+    if(e.target.checked) s.add(e.target.dataset.val); else s.delete(e.target.dataset.val);
+    render();
+  }));
+}
+
+function visible(){
+  return TASKS.filter(t=>{
+    if(filters.priority.size && !filters.priority.has(t.priority)) return false;
+    if(filters.status.size && !filters.status.has(t.status)) return false;
+    if(filters.owner.size && !filters.owner.has(t.primary) && !filters.owner.has(t.secondary)) return false;
+    if(filters.section.size && !filters.section.has(t.section)) return false;
+    if(filters.q && !(`${t.id} ${t.topic} ${t.notes} ${t.section} ${t.primary} ${t.secondary}`.toLowerCase().includes(filters.q))) return false;
+    return true;
+  });
+}
+
+function render(){
+  if(document.getElementById("graph").style.display!=="none") drawGraph();
+  else drawTable();
+}
+
+function drawTable(){
+  const rows = visible();
+  const html = `<table>
+    <thead><tr><th>#</th><th>Status</th><th>Priority</th><th>Section</th><th>Topic</th><th>Primary</th><th>Secondary</th><th>Notes</th></tr></thead>
+    <tbody>${rows.map(t=>`<tr>
+      <td>${t.id}</td>
+      <td><span class="pill" style="background:${STATUS_COLOR[t.status]||"#555"}">${t.status}</span></td>
+      <td>${t.priority?`<span class="pill" style="background:${PRIORITY_COLOR[t.priority]};color:#000">${t.priority}</span>`:""}</td>
+      <td>${t.section}</td>
+      <td>${t.topic}</td>
+      <td>${t.primary||""}</td>
+      <td>${t.secondary||""}</td>
+      <td style="color:var(--muted)">${t.notes||""}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+  document.getElementById("table").innerHTML = html;
+}
+
+function buildLinks(nodes){
+  const ids = new Set(nodes.map(n=>n.id));
+  const links = [];
+  // Same section connection
+  const bySection = {};
+  nodes.forEach(n=>{ (bySection[n.section]=bySection[n.section]||[]).push(n); });
+  Object.values(bySection).forEach(group=>{
+    for(let i=0;i<group.length;i++) for(let j=i+1;j<group.length;j++)
+      links.push({source:group[i].id,target:group[j].id,kind:"section"});
+  });
+  // Owner-shared (primary or secondary)
+  nodes.forEach(a=>{
+    nodes.forEach(b=>{
+      if(a.id>=b.id) return;
+      const aOwn=[a.primary,a.secondary].filter(x=>x&&x!=="-");
+      const bOwn=[b.primary,b.secondary].filter(x=>x&&x!=="-");
+      if(aOwn.some(o=>bOwn.includes(o)) && a.section!==b.section)
+        links.push({source:a.id,target:b.id,kind:"owner"});
+    });
+  });
+  // Shared notes/themes
+  const themes = ["Execution <> Exchange","Website design topic","Wessel"];
+  themes.forEach(theme=>{
+    const grp = nodes.filter(n=>(n.notes||"").includes(theme));
+    for(let i=0;i<grp.length;i++) for(let j=i+1;j<grp.length;j++)
+      links.push({source:grp[i].id,target:grp[j].id,kind:"shared",theme});
+  });
+  return links;
+}
+
+function drawGraph(){
+  const svg = d3.select("#graph");
+  svg.selectAll("*").remove();
+  const container = document.getElementById("content");
+  const w = container.clientWidth, h = container.clientHeight;
+  svg.attr("width",w).attr("height",h);
+
+  const nodes = visible().map(d=>({...d}));
+  const links = buildLinks(nodes);
+
+  const g = svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.2,3]).on("zoom",e=>g.attr("transform",e.transform)));
+
+  const sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(d=>d.id).distance(l=>l.kind==="shared"?60:l.kind==="section"?70:130).strength(l=>l.kind==="shared"?0.6:l.kind==="section"?0.25:0.05))
+    .force("charge", d3.forceManyBody().strength(-180))
+    .force("center", d3.forceCenter(w/2,h/2))
+    .force("collide", d3.forceCollide(18));
+
+  const link = g.append("g").selectAll("line").data(links).join("line")
+    .attr("class",d=>"link "+(d.kind==="shared"?"shared":""));
+
+  const node = g.append("g").selectAll("g").data(nodes).join("g").attr("class","node")
+    .call(d3.drag()
+      .on("start",(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;})
+      .on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y;})
+      .on("end",(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}))
+    .on("mouseover",(e,d)=>showTip(e,d))
+    .on("mousemove",moveTip)
+    .on("mouseout",hideTip);
+
+  node.append("circle")
+    .attr("r",d=>d.priority==="Tier 1"?11:d.priority?9:7)
+    .attr("fill",d=>PRIORITY_COLOR[d.priority||""])
+    .attr("stroke",d=>STATUS_COLOR[d.status]||"#555")
+    .attr("stroke-width",d=>d.status==="In Progress"?3:1.5);
+
+  node.append("text").attr("class","label").attr("dx",13).attr("dy",4).text(d=>`#${d.id} ${d.topic.slice(0,38)}`);
+
+  sim.on("tick",()=>{
+    link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+    node.attr("transform",d=>`translate(${d.x},${d.y})`);
+  });
+}
+
+const tip = document.getElementById("tip");
+function showTip(e,d){
+  tip.innerHTML = `<b>#${d.id} – ${d.topic}</b><br>
+    <span style="color:#8b95a7">Section:</span> ${d.section}<br>
+    <span style="color:#8b95a7">Priority:</span> ${d.priority||"—"}<br>
+    <span style="color:#8b95a7">Status:</span> ${d.status}<br>
+    <span style="color:#8b95a7">Primary:</span> ${d.primary||"—"}<br>
+    <span style="color:#8b95a7">Secondary:</span> ${d.secondary||"—"}
+    ${d.notes?`<br><span style="color:#8b95a7">Notes:</span> ${d.notes}`:""}`;
+  tip.style.display="block";
+  moveTip(e);
+}
+function moveTip(e){tip.style.left=(e.pageX+14)+"px";tip.style.top=(e.pageY+14)+"px";}
+function hideTip(){tip.style.display="none";}
+</script>
+</body>
+</html>
