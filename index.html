@@ -66,6 +66,8 @@
     <div class="filter-group" id="f-owner"></div>
     <h3>Section</h3>
     <div class="filter-group" id="f-section"></div>
+    <h3>Edge themes</h3>
+    <div class="filter-group" id="legend"></div>
   </aside>
   <div id="content">
     <svg id="graph"></svg>
@@ -170,6 +172,9 @@ function init(){
   buildFilter("f-status", uniq(TASKS.map(t=>t.status)), "status", v=>v, v=>`<span class="pill" style="background:${STATUS_COLOR[v]||"#555"}">${v}</span>`);
   buildFilter("f-owner", uniq(TASKS.flatMap(t=>[t.primary,t.secondary]).filter(x=>x&&x!=="-")), "owner", v=>v);
   buildFilter("f-section", uniq(TASKS.map(t=>t.section)), "section", v=>v);
+  document.getElementById("legend").innerHTML = Object.entries(EDGE_META).map(([k,m])=>
+    `<label style="cursor:default"><span class="legend-dot" style="background:${m.color}"></span>${m.label}</label>`
+  ).join("");
 
   document.getElementById("search").addEventListener("input", e=>{filters.q=e.target.value.toLowerCase();render();});
   document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{
@@ -233,34 +238,101 @@ function drawTable(){
   document.getElementById("table").innerHTML = html;
 }
 
+// Semantic edges hand-curated from the AFM letter content.
+// Each entry: [a, b, kind]
+const SEMANTIC_EDGES = [
+  // Exchange / RTO qualification — scenarios, proprietary capital, execution-vs-exchange
+  [3,4,"exch-qual"],[3,7,"exch-qual"],[3,8,"exch-qual"],[3,11,"exch-qual"],[3,12,"exch-qual"],[3,13,"exch-qual"],
+  [4,7,"exch-qual"],[4,8,"exch-qual"],[4,11,"exch-qual"],[4,12,"exch-qual"],[4,71,"exch-qual"],
+  [7,8,"exch-qual"],[7,11,"exch-qual"],[7,12,"exch-qual"],
+  [8,11,"exch-qual"],[8,12,"exch-qual"],[8,9,"exch-qual"],
+  [11,12,"exch-qual"],[12,71,"exch-qual"],[6,12,"exch-qual"],
+
+  // Transfer services / no-third-party crypto transfers / TFR
+  [3,5,"transfer"],[5,22,"transfer"],[5,23,"transfer"],[5,24,"transfer"],[5,31,"transfer"],
+  [5,54,"transfer"],[5,76,"transfer"],[5,77,"transfer"],
+  [22,23,"transfer"],[23,24,"transfer"],[24,54,"transfer"],
+  [48,54,"transfer"],[54,76,"transfer"],[76,77,"transfer"],
+
+  // Liquidity providers / pricing / quotes / inventory
+  [4,6,"pricing"],[4,72,"pricing"],[6,10,"pricing"],[6,72,"pricing"],[6,73,"pricing"],[6,75,"pricing"],
+  [10,72,"pricing"],[62,63,"pricing"],[62,72,"pricing"],[62,74,"pricing"],
+  [63,72,"pricing"],[63,73,"pricing"],
+  [71,72,"pricing"],[71,4,"pricing"],
+  [73,75,"pricing"],[74,75,"pricing"],[72,75,"pricing"],
+
+  // Website content & disclosures (CoI, complaints, marketing, pricing, EMI/MiCAR split)
+  [16,2,"website"],[16,21,"website"],[16,27,"website"],[16,28,"website"],
+  [16,38,"website"],[16,69,"website"],[16,75,"website"],
+  [27,28,"website"],[17,28,"website"],
+
+  // Forte group / shareholders / affiliated entities
+  [14,19,"forte"],[14,20,"forte"],[14,29,"forte"],[14,40,"forte"],
+  [19,20,"forte"],[19,29,"forte"],[19,40,"forte"],[19,42,"forte"],
+  [20,29,"forte"],[37,40,"forte"],[37,30,"forte"],[42,38,"forte"],
+
+  // Outsourcing — Art. 73 MiCAR, contract status, sub-providers
+  [29,30,"outsourcing"],[29,49,"outsourcing"],[29,50,"outsourcing"],
+  [30,49,"outsourcing"],[30,50,"outsourcing"],[49,50,"outsourcing"],
+
+  // 3LoD / independence of compliance & internal audit
+  [33,37,"governance"],[33,45,"governance"],[33,46,"governance"],[33,49,"governance"],
+  [45,46,"governance"],[46,49,"governance"],[46,60,"governance"],[46,39,"governance"],
+
+  // AML / CDD / sanctions / TM / training
+  [49,36,"aml"],[49,51,"aml"],[49,52,"aml"],[49,53,"aml"],
+  [50,36,"aml"],[50,51,"aml"],[50,52,"aml"],[50,53,"aml"],
+  [51,14,"aml"],[52,53,"aml"],
+
+  // Board members / fit & proper / substance / time commitment / location
+  [15,39,"board"],[15,43,"board"],
+  [39,40,"board"],[39,41,"board"],[39,43,"board"],[39,61,"board"],
+  [40,41,"board"],[41,43,"board"],[41,61,"board"],
+  [56,39,"board"],[56,40,"board"],[56,41,"board"],[56,42,"board"],
+  [57,58,"board"],[57,59,"board"],[58,59,"board"],[59,60,"board"],
+
+  // Risk management / SIRA
+  [34,35,"risk"],[34,55,"risk"],[35,55,"risk"],[34,77,"risk"],
+
+  // Custody operational
+  [65,66,"custody"],[67,68,"custody"],
+
+  // Complaints
+  [69,70,"complaints"],
+
+  // EMI vs MiCAR delineation
+  [2,18,"emi-micar"],[18,32,"emi-micar"],
+
+  // Application form references
+  [1,2,"refs"],[1,21,"refs"],
+
+  // Prudential / accounting
+  [32,47,"prudential"],[32,43,"prudential"]
+];
+
+const EDGE_META = {
+  "exch-qual":   {color:"#ef4444", label:"Exchange/RTO qualification"},
+  "transfer":    {color:"#06b6d4", label:"Transfer services / TFR"},
+  "pricing":     {color:"#f59e0b", label:"Liquidity & pricing"},
+  "website":     {color:"#3b82f6", label:"Website disclosures"},
+  "forte":       {color:"#a855f7", label:"Forte group / shareholders"},
+  "outsourcing": {color:"#22c55e", label:"Outsourcing (Art. 73)"},
+  "governance":  {color:"#ec4899", label:"3LoD & independence"},
+  "aml":         {color:"#14b8a6", label:"AML / CDD / sanctions"},
+  "board":       {color:"#94a3b8", label:"Board members & fit-and-proper"},
+  "risk":        {color:"#a16207", label:"Risk mgmt / SIRA"},
+  "custody":     {color:"#d946ef", label:"Custody operations"},
+  "complaints":  {color:"#6366f1", label:"Complaints"},
+  "emi-micar":   {color:"#fb7185", label:"EMI vs MiCAR delineation"},
+  "refs":        {color:"#78716c", label:"App-form references"},
+  "prudential":  {color:"#0ea5e9", label:"Prudential / accounting"}
+};
+
 function buildLinks(nodes){
   const ids = new Set(nodes.map(n=>n.id));
-  const links = [];
-  // Same section connection
-  const bySection = {};
-  nodes.forEach(n=>{ (bySection[n.section]=bySection[n.section]||[]).push(n); });
-  Object.values(bySection).forEach(group=>{
-    for(let i=0;i<group.length;i++) for(let j=i+1;j<group.length;j++)
-      links.push({source:group[i].id,target:group[j].id,kind:"section"});
-  });
-  // Owner-shared (primary or secondary)
-  nodes.forEach(a=>{
-    nodes.forEach(b=>{
-      if(a.id>=b.id) return;
-      const aOwn=[a.primary,a.secondary].filter(x=>x&&x!=="-");
-      const bOwn=[b.primary,b.secondary].filter(x=>x&&x!=="-");
-      if(aOwn.some(o=>bOwn.includes(o)) && a.section!==b.section)
-        links.push({source:a.id,target:b.id,kind:"owner"});
-    });
-  });
-  // Shared notes/themes
-  const themes = ["Execution <> Exchange","Website design topic","Wessel"];
-  themes.forEach(theme=>{
-    const grp = nodes.filter(n=>(n.notes||"").includes(theme));
-    for(let i=0;i<grp.length;i++) for(let j=i+1;j<grp.length;j++)
-      links.push({source:grp[i].id,target:grp[j].id,kind:"shared",theme});
-  });
-  return links;
+  return SEMANTIC_EDGES
+    .filter(([a,b])=>ids.has(a)&&ids.has(b))
+    .map(([a,b,kind])=>({source:a,target:b,kind}));
 }
 
 function drawGraph(){
@@ -277,13 +349,23 @@ function drawGraph(){
   svg.call(d3.zoom().scaleExtent([0.2,3]).on("zoom",e=>g.attr("transform",e.transform)));
 
   const sim = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d=>d.id).distance(l=>l.kind==="shared"?60:l.kind==="section"?70:130).strength(l=>l.kind==="shared"?0.6:l.kind==="section"?0.25:0.05))
-    .force("charge", d3.forceManyBody().strength(-180))
+    .force("link", d3.forceLink(links).id(d=>d.id).distance(70).strength(0.5))
+    .force("charge", d3.forceManyBody().strength(-260))
     .force("center", d3.forceCenter(w/2,h/2))
-    .force("collide", d3.forceCollide(18));
+    .force("collide", d3.forceCollide(22));
 
   const link = g.append("g").selectAll("line").data(links).join("line")
-    .attr("class",d=>"link "+(d.kind==="shared"?"shared":""));
+    .attr("class","link")
+    .attr("stroke",d=>(EDGE_META[d.kind]||{}).color||"#3a4555")
+    .attr("stroke-opacity",0.75)
+    .attr("stroke-width",1.6)
+    .on("mouseover",(e,d)=>{
+      const a=typeof d.source==="object"?d.source:nodes.find(n=>n.id===d.source);
+      const b=typeof d.target==="object"?d.target:nodes.find(n=>n.id===d.target);
+      tip.innerHTML = `<b style="color:${EDGE_META[d.kind].color}">${EDGE_META[d.kind].label}</b><br>#${a.id} ${a.topic}<br>↕<br>#${b.id} ${b.topic}`;
+      tip.style.display="block"; moveTip(e);
+    })
+    .on("mousemove",moveTip).on("mouseout",hideTip);
 
   const node = g.append("g").selectAll("g").data(nodes).join("g").attr("class","node")
     .call(d3.drag()
