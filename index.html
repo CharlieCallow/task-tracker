@@ -239,75 +239,163 @@ function drawTable(){
 }
 
 // Semantic edges hand-curated from the AFM letter content.
-// Each entry: [a, b, kind]
+// Each entry: [a, b, kind, reason]
 const SEMANTIC_EDGES = [
-  // Exchange / RTO qualification — scenarios, proprietary capital, execution-vs-exchange
-  [3,4,"exch-qual"],[3,7,"exch-qual"],[3,8,"exch-qual"],[3,11,"exch-qual"],[3,12,"exch-qual"],[3,13,"exch-qual"],
-  [4,7,"exch-qual"],[4,8,"exch-qual"],[4,11,"exch-qual"],[4,12,"exch-qual"],[4,71,"exch-qual"],
-  [7,8,"exch-qual"],[7,11,"exch-qual"],[7,12,"exch-qual"],
-  [8,11,"exch-qual"],[8,12,"exch-qual"],[8,9,"exch-qual"],
-  [11,12,"exch-qual"],[12,71,"exch-qual"],[6,12,"exch-qual"],
+  // Exchange / RTO qualification
+  [3,4,"exch-qual","Q4 flags that the exchange policy contradicts the scenarios — Q3 needs the legal memo to make the same qualification stick."],
+  [3,7,"exch-qual","Q3 says the legal memo doesn't analyse the PoO §3.10 scenarios; Q7 demands legal reasoning for sale Scenarios 1/3/5/7."],
+  [3,8,"exch-qual","Same gap: Q8 demands legal reasoning for purchase Scenarios 2/4/6/8 that Q3 says is missing from the memo."],
+  [3,11,"exch-qual","Both ask why these flows are exchange and not execution-of-orders/RTO."],
+  [3,12,"exch-qual","Q12 asks how third-party-LP sourcing fits the 'proprietary capital' definition the legal memo (Q3) must defend."],
+  [3,13,"exch-qual","Q13 needs missing EMT-to-EMT info in the PoO; Q3 notes the memo refers to EMT-to-EMT but the PoO doesn't."],
+  [4,7,"exch-qual","Q4a 'clients always sell/buy directly from Hillgate' contradicts Scenario 7's flow — Q7 asks for clarification."],
+  [4,8,"exch-qual","Same Q4a contradiction applied to purchase Scenarios 2/4/6/8 (Q8)."],
+  [4,11,"exch-qual","Custody policy (Q11) describes the same scenarios that Q4 says contradict the commercial policy."],
+  [4,12,"exch-qual","Both ask whether Hillgate truly transacts on its own book or routes orders to LPs."],
+  [4,71,"exch-qual","Q4 questions the 'own inventory' claim; Q71 asks for the actual inventory-management policy."],
+  [7,8,"exch-qual","Sale (Q7) and purchase (Q8) versions of the same exchange-vs-RTO qualification problem."],
+  [7,11,"exch-qual","Q11 uses the custody policy's wording to question the same Scenario-1 sale flow Q7 covers."],
+  [7,12,"exch-qual","Both ask whether sale flows really use proprietary capital."],
+  [8,9,"exch-qual","Q9 asks about the 'additional trading activities' mentioned in the same Scenarios 2/4/6/8 in Q8."],
+  [8,11,"exch-qual","Same purchase scenarios viewed through the custody policy lens."],
+  [8,12,"exch-qual","Both ask whether purchase flows truly use proprietary capital."],
+  [11,12,"exch-qual","Both ask why flows that use client funds (not own capital) shouldn't be RTO/execution."],
+  [12,71,"exch-qual","Inventory (Q71) is the operational backing for Q12's 'from its own inventory' claim."],
+  [6,12,"exch-qual","Both touch reliance on a single LP (Circle) versus genuine proprietary-capital exchange."],
 
-  // Transfer services / no-third-party crypto transfers / TFR
-  [3,5,"transfer"],[5,22,"transfer"],[5,23,"transfer"],[5,24,"transfer"],[5,31,"transfer"],
-  [5,54,"transfer"],[5,76,"transfer"],[5,77,"transfer"],
-  [22,23,"transfer"],[23,24,"transfer"],[24,54,"transfer"],
-  [48,54,"transfer"],[54,76,"transfer"],[76,77,"transfer"],
+  // Transfer services
+  [3,5,"transfer","Q3 wants the legal memo to qualify transfer services; Q5 demands the legal reasoning that transfers aren't part of exchange."],
+  [5,22,"transfer","Q22 — how Hillgate prevents third-party crypto transfers — defines what Q5's transfer service actually covers."],
+  [5,23,"transfer","Q23 confirms the ISN platform doesn't allow crypto transfers between clients — limits Q5's transfer scope."],
+  [5,24,"transfer","Whitelisted-address controls (Q24) constrain the transfer service flows in Q5."],
+  [5,31,"transfer","Q31 asks if Hillgate interacts with DeFi — a possible transfer destination under Q5."],
+  [5,54,"transfer","TFR / self-hosted-wallet rules (Q54) apply to the transfers described in Q5."],
+  [5,76,"transfer","Q76 asks how Hillgate complies with ESMA transfer-services Guidelines for the service in Q5."],
+  [5,77,"transfer","Q77 covers operational/cyber risks of the transfer service introduced in Q5."],
+  [22,23,"transfer","Both ensure no crypto transfers reach third parties (third-party payments / ISN)."],
+  [23,24,"transfer","Both control client-to-client and client-to-external transfers."],
+  [24,54,"transfer","Whitelisting (Q24) feeds into TFR self-hosted-wallet ownership checks (Q54)."],
+  [48,54,"transfer","Flow of funds (Q48) is the basis on which TFR compliance (Q54) is assessed."],
+  [54,76,"transfer","Both about disclosures/policies tied to crypto-asset transfers."],
+  [76,77,"transfer","Information disclosure (Q76) and risk arrangements (Q77) for the same transfer service."],
 
-  // Liquidity providers / pricing / quotes / inventory
-  [4,6,"pricing"],[4,72,"pricing"],[6,10,"pricing"],[6,72,"pricing"],[6,73,"pricing"],[6,75,"pricing"],
-  [10,72,"pricing"],[62,63,"pricing"],[62,72,"pricing"],[62,74,"pricing"],
-  [63,72,"pricing"],[63,73,"pricing"],
-  [71,72,"pricing"],[71,4,"pricing"],
-  [73,75,"pricing"],[74,75,"pricing"],[72,75,"pricing"],
+  // Liquidity & pricing
+  [4,6,"pricing","Q4b says policy mentions multiple LPs; Q6 asks how optimal price is achieved with only Circle."],
+  [4,72,"pricing","Q4b's multi-LP claim must satisfy Q72g's expectation of multiple liquidity providers."],
+  [6,10,"pricing","Both ask which liquidity providers, hedging venues and execution venues are actually used."],
+  [6,72,"pricing","Q72 lists the regulatory expectations for the exchange service Q6 describes."],
+  [6,73,"pricing","Q6 asks how the all-in price is calculated; Q73 asks for the fee/spread breakdown."],
+  [6,75,"pricing","Both about pricing transparency and methodology shown to clients."],
+  [10,72,"pricing","Q72g expects a multi-LP setup; Q10 asks for the actual list of LPs/venues."],
+  [62,63,"pricing","Quotes (Q62) reference prices from other sources (Q63) — both about quote construction."],
+  [62,72,"pricing","Quote firmness (Q62) ties to Q72j: an accepted quote must always execute."],
+  [62,74,"pricing","Quote terms (Q62) feed the T&Cs (Q74) the client agrees to."],
+  [63,72,"pricing","Reference-pricing transparency (Q63) maps to Q72l's expectation."],
+  [63,73,"pricing","Mark-up referenced in Q63 must appear in the fee breakdown Q73 demands."],
+  [71,72,"pricing","Inventory mgmt (Q71) is exactly what Q72k requires CASPs to document."],
+  [71,4,"pricing","Q4 questions own-inventory claims; Q71 asks for the inventory policy that backs them up."],
+  [73,75,"pricing","Pricing/fees (Q73) and Art. 77 publication of quotes/concluded transactions (Q75)."],
+  [74,75,"pricing","T&Cs (Q74) reference the commercial pricing rules in Q75."],
+  [72,75,"pricing","Q72's expectations include public price transparency, which Q75 (Art. 77) directly addresses."],
 
-  // Website content & disclosures (CoI, complaints, marketing, pricing, EMI/MiCAR split)
-  [16,2,"website"],[16,21,"website"],[16,27,"website"],[16,28,"website"],
-  [16,38,"website"],[16,69,"website"],[16,75,"website"],
-  [27,28,"website"],[17,28,"website"],
+  // Website
+  [16,2,"website","Q16d explicitly asks how MiCAR vs EMI services are presented on the website — same distinction Q2 demands."],
+  [16,21,"website","The crypto-asset list missing from 2(1)(c) (Q21) needs to be reflected in website mock-ups (Q16)."],
+  [16,27,"website","Onboarding flows (Q27) happen via the website Hillgate is still building (Q16)."],
+  [16,28,"website","Marketing communications (Q28) are delivered through the website."],
+  [16,38,"website","Conflict-of-interest disclosure (Q38, Art. 72(2)) must sit on the website."],
+  [16,69,"website","Complaints handling info (Q69) must be published on the website."],
+  [16,75,"website","Public price/quote disclosure (Q75, Art. 77) must be on the website."],
+  [27,28,"website","Onboarding and marketing share the same client-facing surface and Art. 66 obligations."],
+  [17,28,"website","Social media (Q17) is part of the marketing/promotional channels covered by Q28."],
 
-  // Forte group / shareholders / affiliated entities
-  [14,19,"forte"],[14,20,"forte"],[14,29,"forte"],[14,40,"forte"],
-  [19,20,"forte"],[19,29,"forte"],[19,40,"forte"],[19,42,"forte"],
-  [20,29,"forte"],[37,40,"forte"],[37,30,"forte"],[42,38,"forte"],
+  // Forte
+  [14,19,"forte","UBO/shareholder discrepancy (Q14) feeds the question of whether Hillgate is part of the Forte group (Q19)."],
+  [14,20,"forte","The affiliated-entity list (Q20) follows from the shareholder picture (Q14)."],
+  [14,29,"forte","Outsourcing to Forte (Q29) is part of why Q14c questions Forte's 'passive shareholder' label."],
+  [14,40,"forte","Shakaa is the direct shareholder (Q14) and CEO; Q40 explores his Forte ties."],
+  [19,20,"forte","Group membership (Q19) and the affiliate list (Q20) overlap factually."],
+  [19,29,"forte","The Forte outsourcing arrangement (Q29) is evidence relevant to the group question (Q19)."],
+  [19,40,"forte","Shakaa Capital working under Forte's umbrella (Q40) bears on whether Hillgate is independent (Q19)."],
+  [19,42,"forte","Kassis (SB member, Q42) is Forte's sole UBO — directly relevant to the group definition (Q19)."],
+  [20,29,"forte","Affiliates (Q20) include Forte service providers covered in outsourcing (Q29)."],
+  [37,30,"forte","Hassan provides CCO services via Advision — one of the Q30 outsourcing contracts."],
+  [37,40,"forte","Both probe potential conflicts of interest of Hillgate's key persons."],
+  [42,38,"forte","Van Berkhout's Vivid-Money CoI (Q42) is exactly the kind of CoI Q38 must publish under Art. 72(2)."],
 
-  // Outsourcing — Art. 73 MiCAR, contract status, sub-providers
-  [29,30,"outsourcing"],[29,49,"outsourcing"],[29,50,"outsourcing"],
-  [30,49,"outsourcing"],[30,50,"outsourcing"],[49,50,"outsourcing"],
+  // Outsourcing
+  [29,30,"outsourcing","Q29 = Art. 73 policy compliance; Q30 = the actual unsigned/missing contracts behind it."],
+  [29,49,"outsourcing","Internal audit outsourced to Projective (Q49) falls under Art. 73 compliance (Q29)."],
+  [29,50,"outsourcing","AML outsourcing (Sumsub, ComplyAdvantage) sits inside the Art. 73 framework (Q29)."],
+  [30,49,"outsourcing","Q30 asks for the signed Projective contract; Q49f asks for the same audit contract signed."],
+  [30,50,"outsourcing","Q30 lists Sumsub/ComplyAdvantage as unsigned; Q50 demands those same AML contracts."],
+  [49,50,"outsourcing","Same outsourced AML/audit providers — both requests want the actual signed agreements."],
 
-  // 3LoD / independence of compliance & internal audit
-  [33,37,"governance"],[33,45,"governance"],[33,46,"governance"],[33,49,"governance"],
-  [45,46,"governance"],[46,49,"governance"],[46,60,"governance"],[46,39,"governance"],
+  // 3LoD / independence
+  [33,37,"governance","CCO is 0.8 FTE in 3LoD (Q33); Q37 asks whether Hassan can deliver that alongside his other roles."],
+  [33,45,"governance","3LoD model (Q33) requires the compliance independence Q45 examines."],
+  [33,46,"governance","3LoD model (Q33) requires the audit independence Q46 examines."],
+  [33,49,"governance","Q49 asks how compliance can independently monitor itself when it also performs CDD — a 3LoD concern (Q33)."],
+  [45,46,"governance","Independence of compliance (Q45) and of internal audit (Q46) are sister requirements."],
+  [46,49,"governance","Both probe internal-audit independence and the audit reporting line."],
+  [46,60,"governance","Suitability matrix says CFRO owns audit; charter says CEO does — Q46 flags the inconsistency Q60 must fix."],
+  [46,39,"governance","Audit independence depends on board oversight from members actually based in NL (Q39)."],
 
-  // AML / CDD / sanctions / TM / training
-  [49,36,"aml"],[49,51,"aml"],[49,52,"aml"],[49,53,"aml"],
-  [50,36,"aml"],[50,51,"aml"],[50,52,"aml"],[50,53,"aml"],
-  [51,14,"aml"],[52,53,"aml"],
+  // AML
+  [49,36,"aml","Compliance plan (Q49d) and training framework (Q36) are linked deliverables."],
+  [49,51,"aml","CDD (Q51) is performed by the compliance team — the conflict Q49b flags."],
+  [49,52,"aml","Transaction monitoring (Q52) is part of the compliance role described in Q49."],
+  [49,53,"aml","Sanctions screening (Q53) is part of the compliance role described in Q49."],
+  [50,36,"aml","Q50d requests the concrete training plan; Q36 covers Hillgate's training framework."],
+  [50,51,"aml","Sumsub / ComplyAdvantage (Q50) provide the CDD tooling Q51 relies on."],
+  [50,52,"aml","Same outsourced tools support transaction monitoring (Q52)."],
+  [50,53,"aml","Same outsourced tools support sanctions screening (Q53)."],
+  [51,14,"aml","UBO checks in CDD (Q51c) reference KvK extracts — Q14b flags the UBO-extract discrepancy."],
+  [52,53,"aml","Transaction monitoring alerts and sanctions hits share the same triage workflow."],
 
-  // Board members / fit & proper / substance / time commitment / location
-  [15,39,"board"],[15,43,"board"],
-  [39,40,"board"],[39,41,"board"],[39,43,"board"],[39,61,"board"],
-  [40,41,"board"],[41,43,"board"],[41,61,"board"],
-  [56,39,"board"],[56,40,"board"],[56,41,"board"],[56,42,"board"],
-  [57,58,"board"],[57,59,"board"],[58,59,"board"],[59,60,"board"],
+  // Board / fit & proper
+  [15,39,"board","Head-office substance (Q15) depends on board members actually being present (Q39)."],
+  [15,43,"board","Q43's substance question covers the head-office presence Q15 raises."],
+  [39,40,"board","CEO Shakaa (Q40) — location, role, conflicts — feeds the Q39 management-board questions."],
+  [39,41,"board","CFRO Simmons (Q41) is the other UK-based board member behind the Q39 residence question."],
+  [39,43,"board","Board-member residence (Q39) directly drives the substance assessment (Q43)."],
+  [39,61,"board","Time commitment (Q61) connects to whether board members are actually based in NL (Q39)."],
+  [40,41,"board","Both UK-based key executives — same relocation issue."],
+  [41,43,"board","CFRO performing work from abroad (Q41) ties straight to substance (Q43)."],
+  [41,61,"board","CFRO's split-location work (Q41) raises the time-commitment question (Q61)."],
+  [56,39,"board","CRC (Q56) is required for board members who lived outside NL — Q39 confirms Shakaa/Simmons did."],
+  [56,40,"board","CRC needed for CEO Shakaa (Q40)."],
+  [56,41,"board","CRC needed for CFRO Simmons (Q41)."],
+  [56,42,"board","CRC needed for SB member Van Berkhout (Q42)."],
+  [57,58,"board","Referents (Q57) and application-form §7 (Q58) are both fit-and-proper documentation gaps."],
+  [57,59,"board","Referents (Q57) and CVs (Q59) both contain personal info reviewed for fit-and-proper."],
+  [58,59,"board","App-form §7 answers (Q58) draw on the CV details (Q59)."],
+  [59,60,"board","CV detail (Q59) and Suitability Matrix (Q60) must be consistent."],
 
-  // Risk management / SIRA
-  [34,35,"risk"],[34,55,"risk"],[35,55,"risk"],[34,77,"risk"],
+  // Risk
+  [34,35,"risk","Risk identification process (Q35) is a sub-part of the risk management policy (Q34)."],
+  [34,55,"risk","SIRA (Q55) is the operational expression of the risk management policy (Q34)."],
+  [35,55,"risk","Risks identified per Q35 feed straight into the SIRA (Q55)."],
+  [34,77,"risk","Transfer-service risks (Q77) must be captured in the risk management policy (Q34)."],
 
-  // Custody operational
-  [65,66,"custody"],[67,68,"custody"],
+  // Custody
+  [65,66,"custody","Wallet-key custody (Q65) and withdrawal limits (Q66) are both multi-sig governance controls."],
+  [67,68,"custody","Both probe what the Custody Foundation may actually do with received assets."],
 
   // Complaints
-  [69,70,"complaints"],
+  [69,70,"complaints","Website disclosure (Q69) must accurately reflect the procedure described in Q70."],
 
-  // EMI vs MiCAR delineation
-  [2,18,"emi-micar"],[18,32,"emi-micar"],
+  // EMI vs MiCAR
+  [2,18,"emi-micar","Distinguishing EMI from MiCAR activity (Q2) requires knowing the EMI commencement status (Q18)."],
+  [18,32,"emi-micar","EMI license activity (Q18) feeds the prudential capital calculation (Q32)."],
 
-  // Application form references
-  [1,2,"refs"],[1,21,"refs"],
+  // App-form references
+  [1,2,"refs","Q1's broken cross-references hit the very PoO sections Q2 says mix EMI and MiCAR content."],
+  [1,21,"refs","Q21 fixes one specific cross-reference gap (point 2(1)(c)) that Q1 highlights."],
 
-  // Prudential / accounting
-  [32,47,"prudential"],[32,43,"prudential"]
+  // Prudential
+  [32,47,"prudential","Prudential calculation (Q32) depends on the accounting policy/year (Q47)."],
+  [32,43,"prudential","Capital adequacy (Q32) depends on staffing and substance costs (Q43)."]
 ];
 
 const EDGE_META = {
@@ -332,7 +420,7 @@ function buildLinks(nodes){
   const ids = new Set(nodes.map(n=>n.id));
   return SEMANTIC_EDGES
     .filter(([a,b])=>ids.has(a)&&ids.has(b))
-    .map(([a,b,kind])=>({source:a,target:b,kind}));
+    .map(([a,b,kind,reason])=>({source:a,target:b,kind,reason:reason||""}));
 }
 
 function drawGraph(){
@@ -366,7 +454,10 @@ function drawGraph(){
     .on("mouseover",(e,d)=>{
       const a=typeof d.source==="object"?d.source:nodes.find(n=>n.id===d.source);
       const b=typeof d.target==="object"?d.target:nodes.find(n=>n.id===d.target);
-      tip.innerHTML = `<b style="color:${EDGE_META[d.kind].color}">${EDGE_META[d.kind].label}</b><br>#${a.id} ${a.topic}<br>↕<br>#${b.id} ${b.topic}`;
+      const meta = EDGE_META[d.kind]||{color:"#888",label:d.kind};
+      tip.innerHTML = `<b style="color:${meta.color}">${meta.label}</b>
+        <div style="margin:6px 0;color:#cbd2dc"><b>#${a.id}</b> ${a.topic}<br>↕<br><b>#${b.id}</b> ${b.topic}</div>
+        ${d.reason?`<div style="border-top:1px solid #2a3340;padding-top:6px;color:#e6e9ef">${d.reason}</div>`:""}`;
       tip.style.display="block"; moveTip(e);
     })
     .on("mousemove",moveTip).on("mouseout",hideTip);
